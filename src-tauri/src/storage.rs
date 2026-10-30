@@ -48,25 +48,57 @@ fn lock(path: &Path, locks: &Locks) -> Result<()> {
     held.insert(key, file); Ok(())
 }
 pub fn load(path: &Path, locks: &Locks) -> Result<Value> {
-    let bytes = read_bounded(path, MAX_DOCUMENT)?;
+    let path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    let bytes = read_bounded(&path, MAX_DOCUMENT)?;
     let mut doc: Value = serde_json::from_slice(&bytes).map_err(|e|e.to_string())?; validate(&doc)?;
-    lock(path, locks)?;
+    lock(&path, locks)?;
+    let base = path.parent().unwrap_or_else(|| Path::new("."));
     for image in doc["images"].as_array_mut().unwrap() {
         let source = PathBuf::from(image["source"]["path"].as_str().unwrap());
-        let relative = if source.is_absolute() { source.clone() } else { path.parent().unwrap().join(&source) };
+        let relative = if source.is_absolute() { source.clone() } else { base.join(&source) };
         let absolute = image["source"]["absolutePath"].as_str().map(PathBuf::from);
         let relative_exists = relative.exists();
-        let resolved = if relative_exists { relative.clone() }
+        let mut resolved = if relative_exists { relative.clone() }
             else if let Some(abs) = absolute.as_ref() { if abs.exists() { abs.clone() } else { relative.clone() } }
             else { relative.clone() };
-
+        // If the resolved path does not exist, search the session directory tree for a
+        // file with the same basename (handles images moved into subfolders).
+        if !resolved.exists() {
+            let target_name = source.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+            if !target_name.is_empty() {
+                let mut matches: Vec<PathBuf> = Vec::new();
+                let mut stack: Vec<(PathBuf, u32)> = vec![(base.to_path_buf(), 0)];
+                let mut visited = 0u32;
+                while let Some((dir, depth)) = stack.pop() {
+                    if visited > 5000 || depth > 4 { continue; }
+                    if let Ok(entries) = fs::read_dir(&dir) {
+                        for entry in entries.flatten() {
+                            visited += 1;
+                            if visited > 5000 { break; }
+                            let p = entry.path();
+                            if p.is_dir() {
+                                if depth < 4 { stack.push((p, depth + 1)); }
+                            } else if p.file_name().map(|n| n == source.file_name().unwrap()).unwrap_or(false) {
+                                matches.push(p);
+                                if matches.len() > 1 { break; }
+                            }
+                        }
+                    }
+                }
+                if matches.len() == 1 {
+                    resolved = matches[0].clone();
+                }
+            }
+        }
+        let resolved = resolved.canonicalize().unwrap_or(resolved);
         image["source"]["path"] = json!(resolved.to_string_lossy());
-        if image["source"].get("absolutePath").is_none() {
+        if image["source"].get("absolutePath").is_none() || !PathBuf::from(image["source"]["absolutePath"].as_str().unwrap_or("")).exists() {
             image["source"]["absolutePath"] = json!(resolved.to_string_lossy());
         }
     }
     Ok(json!({"document":doc,"revision":fingerprint(&bytes),"path":path.to_string_lossy()}))
 }
+
 pub fn save(path: &Path, mut doc: Value, revision: Option<String>, locks: &Locks) -> Result<String> {
     validate(&doc)?; lock(path, locks)?;
     if path.exists() {
@@ -132,6 +164,17 @@ mod tests {
         assert_eq!(load(&path,&locks).unwrap()["document"],doc());
     }
     #[test] fn rejects_unsupported_schema_and_duplicate_ids(){assert!(validate(&json!({"schemaVersion":2})).is_err());assert!(validate(&json!({"schemaVersion":1,"sessionId":"x","images":[{"id":"a","source":{"path":"x"},"rating":11}]})).is_err());}
+    #[test] fn load_finds_images_in_subfolders(){
+        let dir=tempfile::tempdir().unwrap();let sessdir=dir.path().join("Character Bible");fs::create_dir_all(&sessdir).unwrap();let imgdir=sessdir.join("Approved");fs::create_dir_all(&imgdir).unwrap();let img=imgdir.join("pic.png");fs::write(&img,b"x").unwrap();
+        let locks=Locks::default();
+        let doc=json!({"schemaVersion":1,"sessionId":"t","images":[{"id":"a","name":"pic.png","rating":null,"tags":[],"notes":"","source":{"path":"pic.png","size":1,"modified":""},"width":1,"height":1,"metadata":{}}],"tags":{},"comparison":[],"active":null,"view":{"mode":"grid","pan":"all","zoom":"all","viewports":{},"pair":[],"divider":50,"horizontal":false,"gridCols":0,"gridRows":0,"dividerLine":true,"dividerHandler":true,"handlerReposition":false,"handlerOffset":0,"dividerColor":"#e7dfff"}});
+        let session_path=sessdir.join("s.copla");
+        save(&session_path,doc,None,&locks).unwrap();
+        let loaded=load(&session_path,&locks).unwrap();
+        let resolved=loaded["document"]["images"][0]["source"]["path"].as_str().unwrap();
+        println!("resolved: {}", resolved);
+        assert!(Path::new(resolved).exists(), "resolved path should exist: {}", resolved);
+    }
     #[test] fn load_resolves_relative_and_absolute_paths(){
         let dir=tempfile::tempdir().unwrap();let sessdir=dir.path().join("sessions");fs::create_dir(&sessdir).unwrap();let imgdir=dir.path().join("images");fs::create_dir(&imgdir).unwrap();let img=imgdir.join("a.png");fs::write(&img,b"x").unwrap();
         let locks=Locks::default();
