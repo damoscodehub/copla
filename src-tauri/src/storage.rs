@@ -53,9 +53,17 @@ pub fn load(path: &Path, locks: &Locks) -> Result<Value> {
     lock(path, locks)?;
     for image in doc["images"].as_array_mut().unwrap() {
         let source = PathBuf::from(image["source"]["path"].as_str().unwrap());
-        let relative = if source.is_absolute() { source } else { path.parent().unwrap().join(source) };
-        let resolved = if relative.exists() { relative } else { image["source"]["absolutePath"].as_str().map(PathBuf::from).filter(|p|p.exists()).unwrap_or(relative) };
+        let relative = if source.is_absolute() { source.clone() } else { path.parent().unwrap().join(&source) };
+        let absolute = image["source"]["absolutePath"].as_str().map(PathBuf::from);
+        let relative_exists = relative.exists();
+        let resolved = if relative_exists { relative.clone() }
+            else if let Some(abs) = absolute.as_ref() { if abs.exists() { abs.clone() } else { relative.clone() } }
+            else { relative.clone() };
+
         image["source"]["path"] = json!(resolved.to_string_lossy());
+        if image["source"].get("absolutePath").is_none() {
+            image["source"]["absolutePath"] = json!(resolved.to_string_lossy());
+        }
     }
     Ok(json!({"document":doc,"revision":fingerprint(&bytes),"path":path.to_string_lossy()}))
 }
@@ -124,4 +132,21 @@ mod tests {
         assert_eq!(load(&path,&locks).unwrap()["document"],doc());
     }
     #[test] fn rejects_unsupported_schema_and_duplicate_ids(){assert!(validate(&json!({"schemaVersion":2})).is_err());assert!(validate(&json!({"schemaVersion":1,"sessionId":"x","images":[{"id":"a","source":{"path":"x"},"rating":11}]})).is_err());}
+    #[test] fn load_resolves_relative_and_absolute_paths(){
+        let dir=tempfile::tempdir().unwrap();let sessdir=dir.path().join("sessions");fs::create_dir(&sessdir).unwrap();let imgdir=dir.path().join("images");fs::create_dir(&imgdir).unwrap();let img=imgdir.join("a.png");fs::write(&img,b"x").unwrap();
+        let locks=Locks::default();
+        let doc=json!({"schemaVersion":1,"sessionId":"t","images":[{"id":"a","name":"a","rating":null,"tags":[],"notes":"","source":{"path":img.to_string_lossy(),"size":1,"modified":""},"width":1,"height":1,"metadata":{}}],"tags":{},"comparison":[],"active":null,"view":{"mode":"grid","pan":"all","zoom":"all","viewports":{},"pair":[],"divider":50,"horizontal":false}});
+        let session_path=sessdir.join("s.copla");
+        let _rev=save(&session_path,doc,None,&locks).unwrap();
+        // saved path should be relative
+        let saved:Value=serde_json::from_slice(&fs::read(&session_path).unwrap()).unwrap();
+        println!("saved source path: {}", saved["images"][0]["source"]["path"]);
+        assert!(saved["images"][0]["source"]["absolutePath"].as_str().unwrap().contains("a.png"));
+        // load resolves to absolute existing path
+        let loaded=load(&session_path,&locks).unwrap();
+        let resolved=loaded["document"]["images"][0]["source"]["path"].as_str().unwrap();
+        println!("resolved: {}", resolved);
+        assert!(Path::new(resolved).exists());
+        assert!(Path::new(resolved).is_absolute());
+    }
 }
