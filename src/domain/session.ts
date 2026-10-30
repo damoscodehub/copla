@@ -20,9 +20,9 @@ export const sessionSchema = z.object({
 export type Session=z.infer<typeof sessionSchema>;
 export type ImageRecord=z.infer<typeof imageSchema>;
 export type FileEffect={id:string;before:string;after:string;fingerprint:string};
-export type Entry={label:string;before:Session;after:Session;effect?:FileEffect;group?:string;time:number;started:number};
+export type Entry={label:string;before:Session;after:Session;effect?:FileEffect;group?:string;time:number;started:number;accent?:{before:string;after:string}};
 export type History={past:Entry[];future:Entry[]};
-export function createSession():Session {const now=new Date().toISOString();return {schemaVersion:1,sessionId:crypto.randomUUID(),title:'Untitled session',createdAt:now,updatedAt:now,images:[],tags:{},comparison:[],active:null,view:{mode:'grid',pan:'none',zoom:'none',viewports:{},pair:[],divider:50,horizontal:false}};}
+export function createSession():Session {const now=new Date().toISOString();return {schemaVersion:1,sessionId:crypto.randomUUID(),title:'Untitled session',createdAt:now,updatedAt:now,images:[],tags:{},comparison:[],active:null,view:{mode:'grid',pan:'all',zoom:'all',viewports:{},pair:[],divider:50,horizontal:false}};}
 export function signature(doc:Session):string {const {view,active,updatedAt,...data}=doc;return JSON.stringify(data);}
 export function reconcile(doc:Session):Session {
   const ids=new Set(doc.images.map(i=>i.id));const comparison=doc.comparison.filter(id=>ids.has(id)).slice(0,8);

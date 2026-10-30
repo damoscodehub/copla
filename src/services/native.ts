@@ -4,7 +4,7 @@ import { sessionSchema,type Session } from '../domain/session';
 export const desktop=isTauri();
 export type Asset={url:string;thumbnail:string;missing?:boolean;changed?:boolean};
 export type Probe={path:string;name:string;width:number;height:number;size:number;modified:string;thumbnail:string;metadata:Record<string,unknown>};
-export type Preferences={theme:'dark'|'light';recent:string[];tags:string[];background?:'neutral'|'checker'};
+export type Preferences={theme:'dark'|'light';recent:string[];tags:string[];background?:'neutral'|'checker';accent?:string};
 export type Recovery={document:Session;path:string|null;revision:string|null};
 export async function chooseImages(){if(!desktop)return [];const result=await open({multiple:true,filters:[{name:'Images',extensions:['png','jpg','jpeg','webp']}]});return Array.isArray(result)?result:result?[result]:[];}
 export async function chooseSession(){return desktop?await open({multiple:false,filters:[{name:'Copla sessions',extensions:['copla','coplapack']}]}):null;}
