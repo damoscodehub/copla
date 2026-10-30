@@ -10,7 +10,7 @@ export const imageSchema = z.object({
 export const sessionSchema = z.object({
   schemaVersion:z.literal(1),sessionId:z.string(),title:z.string(),createdAt:z.string(),updatedAt:z.string(),
   images:z.array(imageSchema).max(10000),tags:z.record(z.string(),z.string()),comparison:z.array(z.string()).max(8),active:z.string().nullable(),
-  view:z.object({mode:z.enum(['grid','carousel','ab']),pan:z.enum(['none','all','selection']),zoom:z.enum(['none','all','selection']),viewports:z.record(z.string(),viewportSchema),pair:z.array(z.string()).max(2),divider:z.number().min(0).max(100),horizontal:z.boolean()})
+  view:z.object({mode:z.enum(['grid','carousel','ab']),pan:z.enum(['none','all','selection']),zoom:z.enum(['none','all','selection']),viewports:z.record(z.string(),viewportSchema),pair:z.array(z.string()).max(2),divider:z.number().min(0).max(100),horizontal:z.boolean(),gridCols:z.number().int().min(0).max(20).default(0),gridRows:z.number().int().min(0).max(20).default(0),dividerLine:z.boolean().default(true),dividerHandler:z.boolean().default(true),handlerReposition:z.boolean().default(false),handlerOffset:z.number().default(0),dividerColor:z.string().default('#e7dfff')})
 }).superRefine((doc,ctx)=>{
   const ids=new Set(doc.images.map(i=>i.id));
   if(ids.size!==doc.images.length)ctx.addIssue({code:'custom',message:'Duplicate image identifiers'});
@@ -22,7 +22,7 @@ export type ImageRecord=z.infer<typeof imageSchema>;
 export type FileEffect={id:string;before:string;after:string;fingerprint:string};
 export type Entry={label:string;before:Session;after:Session;effect?:FileEffect;group?:string;time:number;started:number;accent?:{before:string;after:string}};
 export type History={past:Entry[];future:Entry[]};
-export function createSession():Session {const now=new Date().toISOString();return {schemaVersion:1,sessionId:crypto.randomUUID(),title:'Untitled session',createdAt:now,updatedAt:now,images:[],tags:{},comparison:[],active:null,view:{mode:'grid',pan:'all',zoom:'all',viewports:{},pair:[],divider:50,horizontal:false}};}
+export function createSession():Session {const now=new Date().toISOString();return {schemaVersion:1,sessionId:crypto.randomUUID(),title:'Untitled session',createdAt:now,updatedAt:now,images:[],tags:{},comparison:[],active:null,view:{mode:'grid',pan:'all',zoom:'all',viewports:{},pair:[],divider:50,horizontal:false,gridCols:0,gridRows:0,dividerLine:true,dividerHandler:true,handlerReposition:false,handlerOffset:0,dividerColor:'#e7dfff'}};}
 export function signature(doc:Session):string {const {view,active,updatedAt,...data}=doc;return JSON.stringify(data);}
 export function reconcile(doc:Session):Session {
   const ids=new Set(doc.images.map(i=>i.id));const comparison=doc.comparison.filter(id=>ids.has(id)).slice(0,8);
