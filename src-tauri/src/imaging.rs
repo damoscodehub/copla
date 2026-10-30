@@ -2,7 +2,7 @@ use crate::storage::{self, Result};
 use base64::Engine;
 use image::{ImageDecoder, ImageFormat, ImageReader};
 use serde_json::{json, Value};
-use std::{fs::{self, File}, io::{BufReader, Cursor, Read}, path::Path};
+use std::{fs::{self, File}, io::{BufReader, Cursor, Read}, path::{Path, PathBuf}};
 use tauri::Manager;
 
 const MAX_IMAGE_BYTES:u64=256*1024*1024;
@@ -79,4 +79,41 @@ pub async fn rename_image(app:tauri::AppHandle,path:String,name:String,expected:
         app.asset_protocol_scope().allow_file(&destination).map_err(|e|e.to_string())?;
         Ok(json!({"path":destination.to_string_lossy(),"fingerprint":digest}))
     }).await.map_err(|e|e.to_string())?
+}
+
+#[tauri::command]
+pub async fn scan_folder(folder: String, name: String) -> Result<Value> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let root = Path::new(&folder).canonicalize().map_err(|e| e.to_string())?;
+        if !root.is_dir() { return Err("Not a directory".into()); }
+        let target = name.to_lowercase();
+        let mut candidates: Vec<Value> = Vec::new();
+        let mut all: Vec<Value> = Vec::new();
+        let mut stack: Vec<(PathBuf, u32)> = vec![(root.clone(), 0)];
+        let mut visited: u32 = 0;
+        while let Some((dir, depth)) = stack.pop() {
+            if visited > 5000 { break; }
+            if depth > 4 { continue; }
+            let entries = match fs::read_dir(&dir) { Ok(e) => e, Err(_) => continue };
+            for entry in entries.flatten() {
+                visited += 1;
+                if visited > 5000 { break; }
+                let path = entry.path();
+                if path.is_dir() {
+                    if depth < 4 { stack.push((path, depth + 1)); }
+                    continue;
+                }
+                let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+                if !["png", "jpg", "jpeg", "webp"].contains(&ext.as_str()) { continue; }
+                let fname = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+                let stat = match fs::metadata(&path) { Ok(s) => s, Err(_) => continue };
+                let item = json!({"path": path.to_string_lossy(), "name": fname, "size": stat.len(), "modified": stat.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis().to_string()).unwrap_or_default()});
+                all.push(item.clone());
+                if fname.to_lowercase() == target { candidates.push(item); }
+            }
+        }
+        let mut chosen = if candidates.is_empty() { all } else { candidates };
+        chosen.truncate(200);
+        Ok(json!(chosen))
+    }).await.map_err(|e| e.to_string())?
 }

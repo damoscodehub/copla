@@ -20,3 +20,4 @@ export async function readRecovery():Promise<Recovery|null>{const value=desktop?
 export const clearRecovery=async()=>desktop?invoke('clear_recovery'):localStorage.removeItem('copla-recovery');
 export const releaseSessions=async()=>{if(desktop)await invoke('release_sessions');};
 export const renameFile=(path:string,name:string,expected:string|null)=>invoke<{path:string;fingerprint:string}>('rename_image',{path,name,expected});
+export async function scanFolder(folder:string,name:string):Promise<Array<{path:string;name:string;size:number;modified:string}>>{return invoke('scan_folder',{folder,name});}
