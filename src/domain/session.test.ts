@@ -1,0 +1,9 @@
+import { describe,it,expect } from 'vitest';
+import { appendHistory,createSession,editImages,reconcile,sessionSchema,signature,type History } from './session';
+const image=(id:string,rating:number|null=null)=>({id,name:id,rating,tags:[],notes:'',source:{path:id,size:1,modified:''},width:100,height:100,metadata:{}});
+describe('session editing',()=>{
+  it('preserves individual values in a grouped rating operation',()=>{const before={...createSession(),images:[image('a',2),image('b',7)]};const after=editImages(before,['a','b'],i=>({...i,rating:9}));const h=appendHistory({past:[],future:[]},{label:'rating',before,after,time:1,started:1});expect(h.past[0].before.images.map(i=>i.rating)).toEqual([2,7]);expect(after.images.map(i=>i.rating)).toEqual([9,9]);});
+  it('caps history, invalidates redo, and groups consecutive typing',()=>{const doc=createSession();let h:History={past:[],future:[]};for(let i=0;i<105;i++)h=appendHistory(h,{label:'edit',before:doc,after:doc,time:i*1000,started:i*1000});expect(h.past).toHaveLength(100);h.future=[h.past[0]];h=appendHistory(h,{label:'note',before:doc,after:doc,time:200000,started:200000,group:'a'});h=appendHistory(h,{label:'note',before:doc,after:doc,time:200200,started:200200,group:'a'});expect(h.future).toHaveLength(0);expect(h.past).toHaveLength(100);expect(h.past.at(-1)?.started).toBe(200000);});
+  it('ignores viewport-only changes for dirty state',()=>{const doc=createSession();expect(signature({...doc,view:{...doc.view,mode:'ab'}})).toBe(signature(doc));});
+  it('repairs references after removal and rejects invalid ratings',()=>{const doc={...createSession(),images:[image('a')],comparison:['a','gone'],active:'gone'};expect(reconcile(doc).comparison).toEqual(['a']);expect(reconcile(doc).active).toBe('a');expect(sessionSchema.safeParse({...doc,images:[image('a',11)]}).success).toBe(false);});
+});

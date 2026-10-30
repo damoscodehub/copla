@@ -1,0 +1,9 @@
+{
+  "images": 8,
+  "width": 4096,
+  "height": 4096,
+  "decodeMs": 341,
+  "meanFrameMs": 16.667499999205273,
+  "maxFrameMs": 17.5,
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0"
+}

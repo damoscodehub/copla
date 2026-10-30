@@ -1,8 +1,8 @@
 # Copla — Master Development Plan
 
-Version: 1.1  
+Version: 1.2  
 Date: October 29, 2026  
-Status: Planning baseline; implementation has not started.
+Status: Research gate complete; implementation authorized and beginning. See `docs/research/open-source-landscape.md` and `docs/decisions/0001-component-reuse.md`.
 
 ## 1. Purpose and planning authority
 
@@ -267,7 +267,7 @@ Reject path traversal, absolute archive paths, symlink escape routes, suspicious
 
 ### 9.1 Provisional implementation baseline
 
-The following stack is a working proposal, not a final selection. M0's research gate must assess existing applications and reusable components before this baseline is confirmed or revised. Prefer a custom Copla workflow assembled from suitable maintained components when evidence supports it; do not assume either a fork or a ground-up implementation is best before investigation.
+M0 research selected a custom Copla domain using reusable infrastructure. Tauri/React/Rust remains the baseline for M1 validation. Adopt TanStack Virtual and Lucide, use explicit native image codecs, and implement shared normalized viewport controls; react-zoom-pan-pinch remains an evaluated fallback. See ADR 0001 for rationale and the research report for inspected revisions and licenses.
 
 - **Desktop shell:** Tauri 2 with Rust for native services.
 - **Interface:** React and TypeScript, with Vite and pnpm for development/build tooling.
