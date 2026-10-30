@@ -1,7 +1,7 @@
 import { convertFileSrc,invoke,isTauri } from '@tauri-apps/api/core';
 import { open,save } from '@tauri-apps/plugin-dialog';
 import { sessionSchema,type Session } from '../domain/session';
-export const desktop=isTauri();
+export const desktop=isTauri();console.log('native.desktop=',desktop);
 export type Asset={url:string;thumbnail:string;missing?:boolean;changed?:boolean};
 export type Probe={path:string;name:string;width:number;height:number;size:number;modified:string;thumbnail:string;metadata:Record<string,unknown>};
 export type Preferences={theme:'dark'|'light';recent:string[];tags:string[];background?:'neutral'|'checker';accent?:string};
