@@ -10,6 +10,13 @@ The project is under active implementation. See `MASTER_PLAN.md` for agreed scop
 
 The browser development server is a UI test harness; native filesystem capabilities require the desktop application. No cloud account is required.
 
+## Launching a local release build
+
+After running `npm run desktop:build`, double-click `Launch Copla.cmd` in the
+repository root to start the built application. This is a workspace launcher;
+it does not create a portable edition or change where Copla stores its local
+preferences and recovery data.
+
 ## Security and license
 
 Security reports are handled according to `SECURITY.md`. Copla is distributed
