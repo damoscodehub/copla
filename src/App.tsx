@@ -8,6 +8,7 @@ import { Plus,FolderOpen,Save,Download,Undo2,Redo2,Grid2X2,GalleryHorizontalEnd,
 import { appendHistory,createSession,editImages,normalizedTag,reconcile,sessionSchema,signature,type Session,type History,type FileEffect,type ImageRecord } from './domain/session';
 import { initialViewport,targets,type Viewport as View } from './viewport/geometry';
 import * as native from './services/native';
+import * as imageStore from './services/ImageStore';
 import { Viewport } from './components/Viewport';
 
 function IconButton({label,children,onClick,disabled,active}:{label:string;children:ReactNode;onClick:()=>void;disabled?:boolean;active?:boolean}) {return <button className={`icon-button ${active?'active':''}`} aria-label={label} title={label} onClick={onClick} disabled={disabled}>{children}</button>;}
@@ -46,7 +47,41 @@ useEffect(()=>{void native.preferences().then(p=>{setPrefs(p);const c=p.accent||
   const commit=(label:string,next:Session,group?:string,effect?:FileEffect)=>{if(!doc||signature(next)===signature(doc))return;const after=reconcile({...next,updatedAt:new Date().toISOString()});const time=Date.now();setHistory(h=>appendHistory(h,{label,before:doc,after,group,effect,time,started:time}));setDoc(after);};
   const changeView=(patch:Partial<Session['view']>)=>setDoc(d=>d?{...d,view:{...d.view,...patch}}:d);
   const patchSelected=(label:string,patch:(image:ImageRecord)=>ImageRecord,group?:string)=>{if(doc)commit(label,editImages(doc,selection.length?selection:doc.active?[doc.active]:[],patch),group);};
-  const hydrate=async(document:Session)=>{const next:Record<string,native.Asset>={};for(let index=0;index<document.images.length;index++){const image=document.images[index];let inspected:any|null=null;if(native.desktop){const sessionDir=path?path.replace(/[\\/][^\\/]*$/,''):'';const candidates=[image.source.path,image.source.absolutePath,sessionDir&&image.source.path?sessionDir+'/'+image.source.path:undefined].filter(Boolean) as string[];for(const candidate of candidates){try{inspected=await native.inspect(candidate);break;}catch(error){console.error('inspect failed',candidate,error);}}}if(inspected){next[image.id]={url:native.sourceUrl(inspected.path),thumbnail:inspected.thumbnail,changed:inspected.size!==image.source.size||inspected.modified!==image.source.modified};}else if(!native.desktop){next[image.id]={url:native.sourceUrl(image.source.path),thumbnail:native.sourceUrl(image.source.path),changed:false,missing:false};}else{next[image.id]={url:'',thumbnail:'',missing:true};}setProgress(`${index+1} / ${document.images.length}`);if(index%8===0)setAssets({...next});}setAssets(next);};
+  const hydrate=async(document:Session)=>{
+  // FIX WEB: revoke old blob URLs to avoid leaks
+  if(!native.desktop) imageStore.revokeAll();
+  const next:Record<string,native.Asset>={};
+  for(let index=0;index<document.images.length;index++){
+    const image=document.images[index];
+    if(native.desktop){
+      const sessionDir=path?path.replace(/[\\/][^\\/]*$/,''):'';
+      const candidates=[image.source.path,image.source.absolutePath,sessionDir&&image.source.path?sessionDir+'/'+image.source.path:undefined].filter(Boolean) as string[];
+      let inspected:any|null=null;
+      for(const candidate of candidates){try{inspected=await native.inspect(candidate);break;}catch(error){console.error('inspect failed',candidate,error);}}
+      if(inspected){
+        next[image.id]={url:native.sourceUrl(inspected.path),thumbnail:inspected.thumbnail,changed:inspected.size!==image.source.size||inspected.modified!==image.source.modified};
+      }else{
+        next[image.id]={url:'',thumbnail:'',missing:true};
+      }
+    }else{
+      try{
+        const url = await imageStore.getImageUrl(image.id);
+        if(url){
+          next[image.id]={url,thumbnail:url,changed:false,missing:false};
+        }else{
+          console.warn('blob missing for', image.id, image.name);
+          next[image.id]={url:'',thumbnail:'',missing:true};
+        }
+      }catch(e){
+        console.error('imageStore get failed', e);
+        next[image.id]={url:'',thumbnail:'',missing:true};
+      }
+    }
+    setProgress(`${index+1} / ${document.images.length}`);
+    if(index%8===0) setAssets({...next});
+  }
+  setAssets(next);
+};
   const enter=async(document:Session,file:string|null=null,rev:string|null=null,saved=true)=>{console.log('enter',!!document,document?.images.length,file,native.desktop);setDoc(reconcile(document));setPath(file);setRevision(rev);setBaseline(saved?signature(document):signature(createSession()));setHistory({past:[],future:[]});setSelection(document.active?[document.active]:[]);setQuery('');setAssets({});setGridCols(document.view.gridCols||0);setGridRows(document.view.gridRows||0);setDividerLine(document.view.dividerLine??true);setDividerHandler(document.view.dividerHandler??true);setHandlerReposition(document.view.handlerReposition??false);setHandlerOffset(document.view.handlerOffset||0);setDividerColor(document.view.dividerColor||'#e7dfff');await hydrate(document);};
   const perform=async(fn:()=>Promise<void>)=>{if(current.current.busy)return;setBusy(true);try{await fn();}catch(error){notify(error);}finally{setBusy(false);setProgress('');}};
   const save=async(as=false):Promise<boolean>=>{const state=current.current;if(!state.doc)return false;try{const next={...state.doc,updatedAt:new Date().toISOString()};if(!native.desktop){const blob=new Blob([JSON.stringify(next,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`${next.title}.copla`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);setBaseline(signature(next));notify(t('saveComplete'));return true;}const destination=as||!state.path?await native.chooseSave('copla',next.title):state.path;if(!destination)return false;setBusy(true);const rev=await native.saveSession(destination,next,destination===state.path?state.revision:null);setPath(destination);setRevision(rev);setBaseline(signature(next));remember(destination);await native.clearRecovery();notify(t('saveComplete'));return true;}catch(error){notify(error);return false;}finally{setBusy(false);}};
@@ -55,7 +90,37 @@ useEffect(()=>{void native.preferences().then(p=>{setPrefs(p);const c=p.accent||
   const openPath=(file:string)=>guard(()=>{void perform(async()=>{let actual=file;if(file.toLowerCase().endsWith('.coplapack')){const folder=await open({directory:true,title:t('packageFolder')});if(typeof folder!=='string')return;actual=await invoke<string>('import_package',{path:file,destination:folder});}const result=await native.loadSession(actual);await native.clearRecovery();await enter(result.document,result.path,result.revision);remember(result.path);notify(t('loaded'));});});
   const openSession=()=>{if(!native.desktop){sessionInput.current?.click();return;}void native.chooseSession().then(file=>{if(typeof file==='string')openPath(file);}).catch(notify);};
   const importPaths=async(paths:string[])=>{await perform(async()=>{const base=current.current.doc||createSession();const incoming:ImageRecord[]=[];const added:Record<string,native.Asset>={};const errors:string[]=[];for(let i=0;i<paths.length;i++){setProgress(`${i+1} / ${paths.length}`);try{const result=await native.inspect(paths[i]);if([...base.images,...incoming].some(image=>image.source.path===result.path))continue;const id=crypto.randomUUID();incoming.push({id,name:result.name,rating:null,tags:[],notes:'',source:{path:result.path,size:result.size,modified:result.modified},width:result.width,height:result.height,metadata:result.metadata});added[id]={url:native.sourceUrl(result.path),thumbnail:result.thumbnail};}catch(error){errors.push(`${basename(paths[i])}: ${error}`);}}if(incoming.length){const comparison=base.comparison.length?base.comparison:incoming.slice(0,8).map(i=>i.id);const next=reconcile({...base,images:[...base.images,...incoming],comparison,active:incoming[0].id});if(current.current.doc)commit(t('addImages'),next);else{setDoc(next);setBaseline(signature(base));}setAssets(a=>({...a,...added}));setSelection([incoming[0].id]);}if(errors.length)notify(errors.join('\n'));});};
-  const importBrowser=async(files:File[])=>{await perform(async()=>{const base=current.current.doc||createSession();const records:ImageRecord[]=[];const added:Record<string,native.Asset>={};for(const file of files){if(!['image/png','image/jpeg','image/webp'].includes(file.type))continue;const url=URL.createObjectURL(file);const image=new Image();image.src=url;await image.decode();const id=crypto.randomUUID();records.push({id,name:file.name,rating:null,tags:[],notes:'',source:{path:file.name,size:file.size,modified:String(file.lastModified)},width:image.naturalWidth,height:image.naturalHeight,metadata:{}});added[id]={url,thumbnail:url};}const next=reconcile({...base,images:[...base.images,...records],comparison:base.comparison.length?base.comparison:records.slice(0,8).map(i=>i.id),active:records[0]?.id||base.active});if(current.current.doc)commit(t('addImages'),next);else{setDoc(next);setBaseline(signature(base));}setAssets(a=>({...a,...added}));setSelection(records[0]?[records[0].id]:[]);});};
+  const importBrowser=async(files:File[])=>{
+  await perform(async()=>{
+    const base=current.current.doc||createSession();
+    const records:ImageRecord[]=[];
+    const added:Record<string,native.Asset>={};
+    for(const file of files){
+      if(!['image/png','image/jpeg','image/webp'].includes(file.type)) continue;
+      const id=crypto.randomUUID();
+      try{
+        await imageStore.putImage(id, file);
+        const storedUrl = await imageStore.getImageUrl(id);
+        if(!storedUrl) continue;
+        const image=new Image();
+        image.src=storedUrl;
+        await image.decode();
+        records.push({id,name:file.name,rating:null,tags:[],notes:'',source:{path:file.name,size:file.size,modified:String(file.lastModified)},width:image.naturalWidth,height:image.naturalHeight,metadata:{}});
+        added[id]={url:storedUrl,thumbnail:storedUrl};
+      }catch(e){
+        console.error('importBrowser failed for', file.name, e);
+        try{ await imageStore.deleteImage(id); }catch{}
+      }
+    }
+    if(records.length){
+      const next=reconcile({...base,images:[...base.images,...records],comparison:base.comparison.length?base.comparison:records.slice(0,8).map(i=>i.id),active:records[0]?.id||base.active});
+      if(current.current.doc) commit(t('addImages'),next);
+      else {setDoc(next); setBaseline(signature(base));}
+      setAssets(a=>({...a,...added}));
+      setSelection(records[0]?[records[0].id]:[]);
+    }
+  });
+};
   const addImages=()=>{if(native.desktop)void native.chooseImages().then(importPaths).catch(notify);else fileInput.current?.click();};
   const doHistory=async(direction:'undo'|'redo')=>{if(!doc||busy)return;const entry=(direction==='undo'?history.past:history.future).at(-1);if(!entry)return;await perform(async()=>{try{if(entry.effect){const effect=entry.effect;const from=direction==='undo'?effect.after:effect.before;const to=direction==='undo'?effect.before:effect.after;const result=await native.renameFile(from,basename(to),effect.fingerprint);setAssets(a=>({...a,[effect.id]:{...a[effect.id],url:native.sourceUrl(result.path)}}));}const restored=reconcile({...direction==='undo'?entry.before:entry.after,view:doc.view});setDoc(restored);setSelection(ids=>ids.filter(id=>restored.images.some(i=>i.id===id)));if(entry.accent){const target=direction==='undo'?entry.accent.before:entry.accent.after;setAccent(target);applyAccent(target);updatePrefs({...prefs,accent:target});}setHistory(h=>direction==='undo'?{past:h.past.slice(0,-1),future:[...h.future,entry]}:{past:[...h.past,entry],future:h.future.slice(0,-1)});setBlockedHistory(null);}catch(error){setBlockedHistory(direction);throw error;}});};
   const saveRecovery=useCallback(async()=>{const state=current.current;if(!state.doc||signature(state.doc)===state.baseline)return;try{await native.writeRecovery({document:state.doc,path:state.path,revision:state.revision});setRecoverStatus('recoverReady');}catch{setRecoverStatus('recoveryFailed');}},[]);
@@ -84,7 +149,7 @@ const removeImage=(id:string)=>{if(!doc)return;commit(t('remove'),{...doc,images
   const reorder=(delta:number)=>{if(!doc||!active)return;const images=[...doc.images];const from=images.findIndex(i=>i.id===active.id),to=from+delta;if(to<0||to>=images.length)return;[images[from],images[to]]=[images[to],images[from]];commit(delta<0?t('moveEarlier'):t('moveLater'),{...doc,images});};
   const keyboard=useRef<(event:KeyboardEvent)=>void>(()=>{});keyboard.current=event=>{const target=event.target as HTMLElement;if(target.closest('input,textarea,select,[role="combobox"],dialog'))return;if(busy)return;const modifier=event.ctrlKey||event.metaKey;if(modifier&&event.key.toLowerCase()==='s'){event.preventDefault();void save(event.shiftKey);return;}if(modifier&&event.key.toLowerCase()==='z'){event.preventDefault();void doHistory(event.shiftKey?'redo':'undo');return;}if(modifier&&event.key.toLowerCase()==='y'){event.preventDefault();void doHistory('redo');return;}if(modifier&&event.key.toLowerCase()==='a'){event.preventDefault();setSelection(doc?.images.map(i=>i.id)||[]);return;}if(!doc)return;if(/^[0-9]$/.test(event.key)&&!modifier){event.preventDefault();patchSelected(t('rating'),image=>({...image,rating:event.key==='0'?10:Number(event.key)}));}if(doc.view.mode==='carousel'&&['ArrowLeft','ArrowRight'].includes(event.key)){event.preventDefault();navigate(event.key==='ArrowLeft'?-1:1);}if(event.key==='Escape')setSelection([]);};
   useEffect(()=>{const handler=(event:KeyboardEvent)=>keyboard.current(event);window.addEventListener('keydown',handler);return()=>window.removeEventListener('keydown',handler);},[]);
-  const tile=(image:ImageRecord,key?:string|number)=> <article key={key||image.id} draggable={key!=='carousel'} className={`image-tile ${doc?.active===image.id?'is-active':''} ${selection.includes(image.id)?'is-selected':''} ${draggedTile===image.id?'is-dragging':''} ${dragOverTile===image.id?'is-dragover':''}`} onDragStart={event=>{if(key==='carousel')return;event.dataTransfer.setData('text/plain',image.id);event.dataTransfer.effectAllowed='move';setDraggedTile(image.id);}} onDragOver={event=>{if(key==='carousel'||!draggedTile||draggedTile===image.id)return;event.preventDefault();setDragOverTile(image.id);}} onDragLeave={()=>{if(dragOverTile===image.id)setDragOverTile(null);}} onDrop={event=>{if(key==='carousel'||!draggedTile||draggedTile===image.id)return;event.preventDefault();const from=doc!.comparison.indexOf(draggedTile);const to=doc!.comparison.indexOf(image.id);if(from<0||to<0)return;const next=[...doc!.comparison];next.splice(from,1);next.splice(to,0,draggedTile);commit(t('reorder'),{...doc!,comparison:next});setDraggedTile(null);setDragOverTile(null);}} onDragEnd={()=>{setDraggedTile(null);setDragOverTile(null);}}><button className="tile-heading" onClick={event=>select(image.id,event)}><span className="tile-number">{doc!.comparison.indexOf(image.id)+1}</span><span>{image.name}</span></button><button className="tile-close" title={t('removeFromStage')} onClick={event=>{event.stopPropagation();commit(t('remove'),{...doc!,comparison:doc!.comparison.filter(x=>x!==image.id)});}}><X size={12}/></button><Viewport image={image} asset={assets[image.id]} view={doc!.view.viewports[image.id]||initialViewport()} onChange={(view,kind)=>applyViewport(image.id,view,kind)}/><span className="zoom-label">{Math.round((doc!.view.viewports[image.id]?.zoom||1)*100)}%</span></article>;
+  const tile=(image:ImageRecord,key?:string|number)=> <article key={key||image.id} className={`image-tile ${doc?.active===image.id?'is-active':''} ${selection.includes(image.id)?'is-selected':''} ${draggedTile===image.id?'is-dragging':''} ${dragOverTile===image.id?'is-dragover':''}`} onDragOver={event=>{if(key==='carousel'||!draggedTile||draggedTile===image.id)return;event.preventDefault();setDragOverTile(image.id);}} onDragLeave={()=>{if(dragOverTile===image.id)setDragOverTile(null);}} onDrop={event=>{if(key==='carousel'||!draggedTile||draggedTile===image.id)return;event.preventDefault();const from=doc!.comparison.indexOf(draggedTile);const to=doc!.comparison.indexOf(image.id);if(from<0||to<0)return;const next=[...doc!.comparison];next.splice(from,1);next.splice(to,0,draggedTile);commit(t('reorder'),{...doc!,comparison:next});setDraggedTile(null);setDragOverTile(null);}}><button className="tile-heading" draggable={key!=='carousel'} onDragStart={event=>{if(key==='carousel')return;event.dataTransfer.setData('text/plain',image.id);event.dataTransfer.effectAllowed='move';setDraggedTile(image.id);}} onDragEnd={()=>{setDraggedTile(null);setDragOverTile(null);}} onClick={event=>select(image.id,event)}><span className="tile-number">{doc!.comparison.indexOf(image.id)+1}</span><span>{image.name}</span></button><button className="tile-close" title={t('removeFromStage')} onClick={event=>{event.stopPropagation();commit(t('remove'),{...doc!,comparison:doc!.comparison.filter(x=>x!==image.id)});}}><X size={12}/></button><Viewport image={image} asset={assets[image.id]} view={doc!.view.viewports[image.id]||initialViewport()} onChange={(view,kind)=>applyViewport(image.id,view,kind)}/><span className="zoom-label">{Math.round((doc!.view.viewports[image.id]?.zoom||1)*100)}%</span></article>;
   return <div className="app" onDragEnter={event=>{if(native.desktop)return;const isFile=event.dataTransfer.types.includes('Files');if(!isFile)return;event.preventDefault();dragCounter.current+=1;setDrop(true);}} onDragOver={event=>{if(native.desktop)return;if(!event.dataTransfer.types.includes('Files'))return;event.preventDefault();}} onDragLeave={event=>{if(native.desktop)return;if(!event.dataTransfer.types.includes('Files'))return;dragCounter.current=Math.max(0,dragCounter.current-1);if(dragCounter.current===0)setDrop(false);}} onDrop={event=>{if(native.desktop)return;event.preventDefault();dragCounter.current=0;setDrop(false);const internal=(event.dataTransfer.getData('text/plain')||'').startsWith('copla-internal');if(internal)return;void importBrowser(Array.from(event.dataTransfer.files));}}>
     <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" multiple hidden onChange={event=>{void importBrowser(Array.from(event.target.files||[]));event.target.value='';}}/>
     <input ref={sessionInput} type="file" accept=".copla" hidden onChange={event=>{const file=event.target.files?.[0];if(file)guard(()=>void perform(async()=>{await enter(sessionSchema.parse(JSON.parse(await file.text())));notify(t('browserHint'));}));event.target.value='';}}/>
