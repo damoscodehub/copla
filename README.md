@@ -9,3 +9,8 @@ Requirements: Node.js 24+, Rust stable, Windows C++ Build Tools, and WebView2. U
 The project is under active implementation. See `MASTER_PLAN.md` for agreed scope, `docs/research/open-source-landscape.md` for reuse research, and `docs/testing/` for actual validation evidence. Unchecked release criteria are not claims of completed behavior.
 
 The browser development server is a UI test harness; native filesystem capabilities require the desktop application. No cloud account is required.
+
+## Security and license
+
+Security reports are handled according to `SECURITY.md`. Copla is distributed
+under the MIT License; see `LICENSE`.

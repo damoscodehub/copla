@@ -1,8 +1,8 @@
 # Copla — Master Development Plan
 
-Version: 1.2  
-Date: October 29, 2026  
-Status: Research gate complete; implementation authorized and beginning. See `docs/research/open-source-landscape.md` and `docs/decisions/0001-component-reuse.md`.
+Version: 1.3
+Date: November 5, 2026
+Status: Implementation is active and an internal desktop build exists. Research, foundation, architecture, and multiple product slices have been completed in working form; their formal release evidence remains incomplete. Public publication is not authorized by this plan until the release-readiness gates in Section 18 have passed and the owner explicitly authorizes publication. See `docs/research/open-source-landscape.md` and `docs/decisions/0001-component-reuse.md`.
 
 ## 1. Purpose and planning authority
 
@@ -10,7 +10,7 @@ Copla is a local desktop application for comparing, evaluating, and organizing i
 
 The first complete release must support the entire agreed image workflow, not merely an image-viewing prototype. Development proceeds through usable increments so the owner can correct interaction and visual decisions before they become expensive to change.
 
-This document defines the implementation plan. It does not authorize publishing, purchasing services, creating remote repositories, or building cloud services. No application code is part of this deliverable.
+This document defines the implementation and release plan. It does not by itself authorize publishing, purchasing services, creating remote repositories, or building cloud services. The repository now contains application code; this plan remains the governing source for scope, verification, and release decisions.
 
 Requirements labeled **agreed** reflect explicit user decisions. Other implementation details are **planning defaults** selected to make the project actionable. Defaults may change after evidence from prototypes or user feedback; changes must preserve agreed requirements or be explicitly discussed.
 
@@ -384,7 +384,9 @@ All interface strings, accessibility labels, errors, menus, and notifications be
 
 ### M0 — Open-source research, reuse decisions, and project foundation
 
-Before application implementation or final architecture selection, conduct a thorough, bounded internet investigation of current open-source projects and comparable applications. Research is a required deliverable, not an optional background activity. This plan update schedules the investigation; it does not claim that it has been performed.
+Status: **Completed.** The research report and component-reuse decision are recorded in `docs/research/open-source-landscape.md` and `docs/decisions/0001-component-reuse.md`. Copla uses selected permissively licensed components and a purpose-built domain layer rather than adapting a whole application.
+
+Before application implementation or final architecture selection, conduct a thorough, bounded internet investigation of current open-source projects and comparable applications. Research is a required deliverable, not an optional background activity.
 
 Research three complementary areas:
 
@@ -418,11 +420,15 @@ Exit: research deliverables and the reuse decision are complete; requirements ma
 
 ### M1 — Architecture and rendering validation
 
+Status: **Working validation completed; release evidence incomplete.** The Tauri/React shell, native bridge, and an eight-image synthetic rendering exercise have been built and tested. The recorded architecture gate includes warmed-frame measurements near 16.67 ms. Fresh-install and real desktop automation coverage remain release work.
+
 Create only the technical prototype needed to validate the shell, renderer, and shortlisted components selected through M0. Exercise eight images, high-DPI, native reads, gesture synchronization, format handling, memory behavior, and packaged execution. Resolve research uncertainties with focused comparisons rather than implementing multiple complete applications.
 
 Exit: benchmark evidence supports the chosen shell or a documented alternative is selected. No full interface investment before this gate.
 
 ### M2 — First complete session slice
+
+Status: **Implemented for internal use; needs release verification.** The repository includes session persistence, image import/load support in native and browser modes, and the interface foundation. The specific recovery, interruption, and fresh-install exercises in the exit criteria must still be demonstrated.
 
 Deliver start screen, new/open, import, single-image viewing, basic session schema, Save/Save As, dirty-state prompts, and the recovery foundation. Establish themes, locale resources, and the command-history architecture now rather than retrofitting them.
 
@@ -430,11 +436,15 @@ Exit: a user can create, save, close, reopen, and recover an unsaved session; fi
 
 ### M3 — Comparison workspace
 
+Status: **Implemented and iterated with owner feedback; needs formal acceptance testing.** Grid, carousel, A/B comparison, viewport controls, and responsive UI refinements have been implemented. All mode combinations, high-DPI behavior, and native interaction automation remain to be proven for a release candidate.
+
 Deliver virtualized browsing, comparison-set selection, grid, carousel, A/B slider, Fit/Fill, pan/zoom synchronization, keyboard behavior, and responsive workspace layout.
 
 Exit: one through eight images work in applicable modes; all nine pan/zoom mode combinations behave correctly; mismatched dimensions and transparency are covered. Request hands-on comparison feedback.
 
 ### M4 — Evaluation and organization
+
+Status: **Partially implemented; verification and scope audit required.** The release gate must compare the actual behavior against every agreed organization, metadata, physical rename, and 100-step history requirement before it can be claimed complete.
 
 Deliver ratings, batch rating, shared tag suggestions, notes, names, basic filters/sorting, metadata inspection, and complete edit-history coverage. Add disk rename with conditional undo and recovery journaling.
 
@@ -442,11 +452,15 @@ Exit: batch operations restore individual prior values; history caps at 100; dis
 
 ### M5 — Portable sessions and resilience
 
+Status: **Partially implemented; release evidence incomplete.** Native storage and portable-package code exist. The native test suite requires execution in a normal Windows environment because restricted temporary-directory permissions prevented several file-system tests from completing in the current environment.
+
 Deliver portable export/import, missing-file relinking, recent-session validation, dropped-session opening, migrations, concurrent-write detection, and interruption-safe persistence.
 
 Exit: a package opens correctly without original paths; corrupt or malicious archives are rejected; missing files preserve annotations; save/export failures preserve the last valid output.
 
 ### M6 — Release hardening and Windows distribution
+
+Status: **Not started as a formal release gate.** This is the current controlling milestone. No public source publication, release tag, installer publication, or remote push is a substitute for the checks below.
 
 Complete keyboard/accessibility review, both themes, performance measurements, fresh-install testing, file associations, dependency/license review, and an installer with an offline runtime strategy. Document signing status and whether any installation prerequisite requires downloading; runtime app use must remain offline.
 
@@ -513,7 +527,7 @@ user.name = damo
 user.email = damoscodehub@gmail.com
 ```
 
-Use `main` as the stable branch and short-lived `feat/`, `fix/`, or `docs/` branches as useful. Keep commits small and use English messages such as `feat: add atomic session saving`. A remote hosting provider/repository is not assumed or created by this plan.
+Use `main` as the stable branch and short-lived `feat/`, `fix/`, or `docs/` branches as useful. Keep commits small and use English messages such as `feat: add atomic session saving`. A remote hosting provider/repository is not assumed or created by this plan. Before a remote is added, inspect the final tracked file list, select a publication license, and obtain explicit owner authorization for the target repository and visibility.
 
 Track source, tests, small synthetic fixtures, lockfiles, and architecture decisions. Ignore private images, portable packages, user sessions, recovery files, local settings, generated thumbnails, dependency directories, and build outputs. Store sample schemas as deliberately named test fixtures so ignoring user sessions does not hide intentional test data.
 
@@ -536,6 +550,45 @@ Version releases semantically. Keep session schema versions independent from app
 
 A milestone is done when its behavior is implemented, relevant checks pass, failure cases are handled, documentation matches actual behavior, and its exit criteria are demonstrated. A passing build alone is insufficient.
 
-The next project action is M0's internet research and reuse assessment, when requested. After that gate and authorization to build, establish the M0 project foundation and proceed to the M1 architecture gate. The owner should first evaluate a working application at M2, then provide comparison-specific feedback at M3. There are no outstanding product questions blocking research; any distribution-license decisions exposed by candidate evaluation must be resolved before adopting affected code.
+The next project action is the M6 release-readiness gate in Section 18. It is intentionally verification-only: it does not change product scope or publish the repository. Any defect, unimplemented agreed requirement, failed check, or license uncertainty returns the project to the relevant milestone before public publication is considered.
 
 This master plan is the baseline for implementation. It intentionally leaves exact visual spacing, minor shortcut refinements, and dependency patch versions adjustable while preserving the agreed product behavior.
+
+## 18. Current release-readiness state and publication gate
+
+### 18.1 Repository snapshot — November 5, 2026
+
+- The current branch is `main`; the most recent commit is `20b5518` (`fix: persist browser image imports across session reloads`).
+- The generated inventory file `filetree.txt` is not part of the product and is now ignored. It must remain untracked; no user file was removed to clean the repository.
+- No Git remote is configured. The proposed destination is `https://github.com/damoscodehub/copla.git`, but no connection or push has occurred.
+- `npm run build`, `npm test`, `cargo test --manifest-path src-tauri/Cargo.toml`, and `cargo build --release --manifest-path src-tauri/Cargo.toml` have passed locally. The frontend suite has seven passing tests and the native suite has seven passing tests.
+- `npm run desktop:build` has produced the NSIS installer successfully. The current unsigned installer is a verification artifact, not a public release artifact.
+- The browser UI smoke test has passed with generated fixtures, covering import, grid, ratings, notes, tags, A/B, themes, carousel, batch undo, and compact layout.
+- Both production-only and full `npm audit` checks reported zero known vulnerabilities at the time of the check.
+- Git integrity inspection found a dangling tree containing an older untracked/generated inventory. This does not indicate branch corruption, but it should be cleaned up or allowed to expire through normal Git maintenance only after confirming that it contains no needed user work.
+- No credentials, private keys, private image/session data, build outputs, or generated inventory files were found in the tracked source or commit history during the publication review.
+- The security review found and the repository corrected one high-severity archive-extraction accounting issue. Portable-package import now caps actual decompressed bytes as well as ZIP-declared sizes, with a native regression test.
+- The repository now includes an MIT License, security reporting policy, contribution guidance, continuous integration workflow, and Dependabot configuration.
+
+### 18.2 Publication decision
+
+**Current decision: the source repository is ready for public publication as an active pre-release development project.** It is not yet ready to claim a finished product release: the full Section 14 product acceptance audit, fresh-install exercise, signing decision, and owner evaluation remain release work. A remote is still absent, and pushing remains an external action that requires explicit owner authorization.
+
+### 18.3 Required, ordered release-readiness work
+
+1. **Perform the requirement-to-implementation audit for a product release.** Mark each item in Section 14 as pass, fail, or deferred with concrete evidence. Any deferred item changes the release scope and requires explicit owner approval; do not quietly label a partial implementation as complete.
+2. **Prepare a signed release candidate.** Set a deliberate pre-release version, verify a fresh offline install, document signing status and known limitations, generate or verify third-party notices, and tag only after all acceptance evidence passes.
+3. **Request explicit publication authorization.** Before adding `origin` or pushing, present the final commit range, target URL, repository visibility, license, release-candidate status, and any known limitations. Push only after the owner explicitly authorizes that exact external action.
+
+### 18.4 Conditions for a safe push
+
+A source push to the proposed GitHub repository is permitted only when all of the following are true:
+
+- The security-focused review reports no unresolved high- or critical-severity publication issue. **Complete:** the one reported high-severity issue was fixed and tested.
+- The tracked-file and Git-history review finds no secrets, private assets, user data, generated build outputs, or unwanted inventory files.
+- A license and any required attribution notices are present and compatible with the dependencies and intended distribution. **Complete for source publication:** MIT License and repository policies are present; distribution notices remain a release-candidate task.
+- The full native and browser/domain checks pass in an environment capable of running them; blocked tests have been rerun rather than assumed successful. **Complete for the current automated suite.**
+- Section 14 has been audited, with any approved scope changes written down. **Required only before representing Copla as a finished product release.**
+- The owner explicitly authorizes adding the proposed remote and pushing the reviewed commit set.
+
+If the goal is merely private backup rather than a public release, the same secret/data/license review is still required, but installer and every end-user acceptance exercise may be scheduled after the private push. The repository visibility must still be explicitly chosen before the remote is created.

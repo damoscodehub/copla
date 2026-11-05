@@ -7,6 +7,11 @@ playwright-report/
 *.copla
 *.coplapack
 !tests/fixtures/*.copla
+sessions/
+packages/
+recovery/
+screenshots/
+filetree.txt
 *.log
 .env*
 .DS_Store
