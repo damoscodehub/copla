@@ -5,6 +5,12 @@
 @media(max-width:950px){.inspector{position:absolute;right:0;top:110px;bottom:213px;width:270px;z-index:10}.work-area.with-inspector{grid-template-columns:minmax(0,1fr)}.browser-toolbar select{display:none}.topbar{gap:8px}.topbar-actions{gap:0}.session-title{width:120px}.compare-button{font-size:10px}.workspace-tools{gap:6px;padding:0 10px}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}.spinner{animation:none}}
 
+/* The Copla mark is drawn as an isotype, not as a letter glyph. */
+.brand-symbol{width:28px;height:28px;font-size:0}
+.brand-symbol::before{content:'';position:absolute;box-sizing:border-box;width:22px;height:22px;left:3px;top:3px;border:3px solid var(--accent);border-right-color:transparent;border-radius:50%}
+.brand-symbol span{width:2px;height:22px;left:calc(50% - 1px);top:3px;background:var(--text)}
+.brand-symbol span::after{width:7px;height:7px;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--text)}
+
 .locate-actions{display:flex;gap:8px;flex-wrap:wrap}.locate-list{display:flex;flex-direction:column;gap:8px;max-height:320px;overflow:auto}.locate-item{display:flex;flex-direction:column;gap:2px;text-align:left;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--elevated)}.locate-item:hover{background:var(--hover)}.locate-item strong{font-size:13px}.locate-item small{color:var(--muted)}.locate-item span{font-size:11px;color:var(--muted);word-break:break-all}
 .missing-dot,.changed-dot{position:absolute;top:6px;right:6px;width:18px;height:18px;border-radius:9px;display:grid;place-items:center;font-size:11px;font-weight:700}.missing-dot{background:var(--danger);color:#201313}.changed-dot{background:var(--accent);color:#181220}
 .divider-readout{font-size:12px;color:var(--muted);min-width:34px;text-align:right}
