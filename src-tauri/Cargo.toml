@@ -3,6 +3,9 @@ name = "copla"
 version = "0.1.0"
 description = "A local image comparison workspace"
 authors = ["damo"]
+license = "MIT"
+homepage = "https://github.com/damoscodehub/copla"
+repository = "https://github.com/damoscodehub/copla"
 edition = "2021"
 
 [build-dependencies]

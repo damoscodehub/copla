@@ -468,6 +468,8 @@ Exit: all release acceptance checks pass; measured limits and known issues are d
 
 ### M7 — Subsequent platform enablement
 
+Status: **Linux x86_64 implementation and local verification complete.** AppImage, Debian, and RPM packages build successfully on the Ubuntu 22.04 baseline; the release binary and AppImage start under WSLg. The repository contains Linux setup and launcher documentation, a platform-safe filename policy, Ubuntu 22.04 CI coverage, and verification evidence at `docs/testing/linux-gate.md`. ARM64, package signing, store publishing, and validation on a non-WSL physical Linux desktop remain separate release work.
+
 Package and validate macOS and Linux separately. Test paths, permissions, filenames, shortcuts, WebView rendering, color, dialogs, drop behavior, and installers. Handle signing/notarization and distribution channels as explicit release tasks.
 
 This milestone is planned future work, not part of the first Windows release's completion criteria. Cross-platform architecture is required from M0 onward; cross-platform certification is not implied until tested.

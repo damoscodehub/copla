@@ -10,7 +10,8 @@
     "test:e2e": "playwright test",
     "tauri": "tauri",
     "desktop": "tauri dev",
-    "desktop:build": "tauri build"
+    "desktop:build": "tauri build",
+    "desktop:build:linux": "tauri build --config src-tauri/tauri.linux.conf.json"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.14.24",

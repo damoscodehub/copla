@@ -6,6 +6,16 @@ use std::{fs::{self, File}, io::{BufReader, Cursor, Read}, path::{Path, PathBuf}
 use tauri::Manager;
 
 const MAX_IMAGE_BYTES:u64=256*1024*1024;
+fn filename_is_valid(name:&str)->bool {
+    if name.is_empty() || name.trim()!=name || name=="." || name==".." || name.chars().any(|c|c<' '||c=='/'||c=='\\') { return false; }
+    #[cfg(windows)]
+    {
+        if name.ends_with('.') || name.chars().any(|c|"<>:\"|?*".contains(c)) { return false; }
+        let stem=Path::new(name).file_stem().and_then(|s|s.to_str()).unwrap_or("").to_uppercase();
+        if ["CON","PRN","AUX","NUL","COM1","COM2","COM3","COM4","COM5","COM6","COM7","COM8","COM9","LPT1","LPT2","LPT3","LPT4","LPT5","LPT6","LPT7","LPT8","LPT9"].contains(&stem.as_str()) { return false; }
+    }
+    true
+}
 fn metadata(path:&Path)->Value {
     let mut values=serde_json::Map::new();
     if let Ok(file)=File::open(path) {
@@ -65,9 +75,7 @@ pub async fn inspect_image(app:tauri::AppHandle,path:String)->Result<Value> {
 pub async fn rename_image(app:tauri::AppHandle,path:String,name:String,expected:Option<String>)->Result<Value> {
     tauri::async_runtime::spawn_blocking(move||{
         let source=Path::new(&path).canonicalize().map_err(|e|e.to_string())?;
-        if name.is_empty()||name.trim()!=name||name.ends_with('.')||name.chars().any(|c|c<' '||"<>:\"/\\|?*".contains(c)){return Err("Invalid filename".into())}
-        let stem=Path::new(&name).file_stem().and_then(|s|s.to_str()).unwrap_or("").to_uppercase();
-        if ["CON","PRN","AUX","NUL","COM1","COM2","COM3","COM4","COM5","COM6","COM7","COM8","COM9","LPT1","LPT2","LPT3","LPT4","LPT5","LPT6","LPT7","LPT8","LPT9"].contains(&stem.as_str()){return Err("Reserved filename".into())}
+        if !filename_is_valid(&name){return Err("Invalid filename".into())}
         if source.extension()!=Path::new(&name).extension(){return Err("Keep the original file extension".into())}
         let destination=source.parent().unwrap().join(name);
         if destination.exists(){return Err("Destination already exists".into())}
@@ -116,4 +124,31 @@ pub async fn scan_folder(folder: String, name: String) -> Result<Value> {
         chosen.truncate(200);
         Ok(json!(chosen))
     }).await.map_err(|e| e.to_string())?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::filename_is_valid;
+
+    #[test]
+    fn filename_rules_reject_path_injection_and_control_characters() {
+        for name in ["", " ", ".", "..", "nested/image.png", "nested\\image.png", "bad\u{0000}.png"] {
+            assert!(!filename_is_valid(name));
+        }
+        assert!(filename_is_valid("concept-final.png"));
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn linux_filename_rules_allow_colons() {
+        assert!(filename_is_valid("Concept: final.png"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_filename_rules_reject_reserved_names() {
+        for name in ["CON.png", "AUX.jpg", "trailing-dot.", "bad?.png"] {
+            assert!(!filename_is_valid(name));
+        }
+    }
 }

@@ -11,5 +11,16 @@
       "assetProtocol": { "enable": true, "scope": [] }
     }
   },
-  "bundle": { "active": true, "targets": ["nsis"], "fileAssociations": [{ "ext": ["copla", "coplapack"], "name": "Copla Session", "role": "Editor" }] }
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+    "category": "Graphics and Design",
+    "shortDescription": "Compare and organize image variants locally",
+    "longDescription": "Copla is a local desktop workspace for comparing and organizing AI-generated image variants.",
+    "homepage": "https://github.com/damoscodehub/copla",
+    "license": "MIT",
+    "licenseFile": "../LICENSE",
+    "fileAssociations": [{ "ext": ["copla", "coplapack"], "name": "Copla Session", "role": "Editor" }]
+  }
 }
