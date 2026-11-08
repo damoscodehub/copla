@@ -22,6 +22,29 @@ npm ci
 npm run desktop
 ```
 
+## Guided Linux Mint setup
+
+For a beginner-friendly install or update from the current Linux branch,
+download the setup script from a terminal:
+
+```sh
+curl -fL https://raw.githubusercontent.com/damoscodehub/copla/feat/linux-support/scripts/setup-linux-mint.sh -o setup-copla-linux-mint.sh
+```
+
+Then run it:
+
+```sh
+sh setup-copla-linux-mint.sh
+```
+
+The script asks for an absolute application-folder path, such as
+`/home/alex/Applications/Copla`. That exact folder becomes the Copla checkout;
+the script never creates an extra `copla` directory inside it. It installs only
+missing prerequisites, clones `feat/linux-support` into an empty selected
+folder or fast-forward updates an existing clean checkout, installs locked
+dependencies, builds the Linux packages, and starts Copla. It refuses to
+overwrite a non-empty folder or discard local source changes.
+
 ## Build and launch
 
 Create Linux distribution artifacts with:
